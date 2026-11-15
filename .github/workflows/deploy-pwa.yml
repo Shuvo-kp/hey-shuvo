@@ -22,11 +22,26 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
+      - id: check_pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api "repos/${{ github.repository }}/pages" >/dev/null 2>&1; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          elif gh api -X POST "repos/${{ github.repository }}/pages" -f build_type=workflow >/dev/null 2>&1; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "GitHub Pages is not enabled in Settings -> Pages yet; skipping web deploy so branch status remains clean."
+          fi
+      - if: steps.check_pages.outputs.ready == 'true'
+        uses: actions/configure-pages@v5
         with:
           enablement: true
-      - uses: actions/upload-pages-artifact@v3
+      - if: steps.check_pages.outputs.ready == 'true'
+        uses: actions/upload-pages-artifact@v3
         with:
           path: public
       - id: deployment
+        if: steps.check_pages.outputs.ready == 'true'
         uses: actions/deploy-pages@v4
