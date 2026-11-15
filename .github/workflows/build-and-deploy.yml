@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -18,25 +18,71 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 21
-      - name: Prepare signing keystore and env
+          java-version: '21'
+      - name: Prepare Android SDK 36.1, licenses, keystore, and env
         run: |
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+
+          mkdir -p "$SDK_ROOT/licenses"
+          printf '\n24333f8a63b6825ea9c5514f83c2829b004d1fee\n8933bad161af4178b1185d1a37fbf41ea5269c55\nd56f5187479451eabf01fb78af6dfcb131a6481e' > "$SDK_ROOT/licenses/android-sdk-license"
+          printf '\n84831b9409646a918e30573bab4c9c91346d8abd' > "$SDK_ROOT/licenses/android-sdk-preview-license"
+
+          SDKMANAGER=""
+          for candidate in \
+            "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
+            "$SDK_ROOT/cmdline-tools/bin/sdkmanager" \
+            "$(find "$SDK_ROOT/cmdline-tools" -maxdepth 3 -name sdkmanager -type f 2>/dev/null | head -n 1)" \
+            "$(command -v sdkmanager 2>/dev/null || true)"; do
+            if [ -n "$candidate" ] && [ -x "$candidate" ]; then
+              SDKMANAGER="$candidate"
+              break
+            fi
+          done
+
+          if [ -n "$SDKMANAGER" ]; then
+            yes | "$SDKMANAGER" --sdk_root="$SDK_ROOT" --licenses > /dev/null 2>&1 || true
+            yes | "$SDKMANAGER" --sdk_root="$SDK_ROOT" "platforms;android-36.1" "build-tools;36.0.0" "platform-tools"
+          else
+            echo "Warning: sdkmanager not found under $SDK_ROOT"
+          fi
+
           if [ -f debug.keystore.base64 ]; then
             base64 -d debug.keystore.base64 > debug.keystore
           fi
           if [ ! -f .env ] && [ -f .env.example ]; then
             cp .env.example .env
           fi
-      - name: Build Debug APK
+      - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: 9.3.1
-          arguments: :app:assembleDebug
+          gradle-version: '9.3.1'
+      - name: Build Debug APK
+        run: gradle :app:assembleDebug --no-daemon --stacktrace
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: HeyShuvo-Android-APK
           path: app/build/outputs/apk/debug/app-debug.apk
+      - name: Publish Direct APK Download (GitHub Release)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk HeyShuvo.apk
+          if gh release view latest-apk >/dev/null 2>&1; then
+            gh release upload latest-apk HeyShuvo.apk --clobber
+            gh release edit latest-apk \
+              --title "Hey Shuvo (Latest Android APK)" \
+              --notes "Tap HeyShuvo.apk below to download and install directly on your Android phone." \
+              --latest
+          else
+            gh release create latest-apk HeyShuvo.apk \
+              --title "Hey Shuvo (Latest Android APK)" \
+              --notes "Tap HeyShuvo.apk below to download and install directly on your Android phone." \
+              --latest
+          fi
 
   deploy-pwa:
     runs-on: ubuntu-latest
@@ -45,9 +91,17 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - id: configure_pages
+        continue-on-error: true
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - if: steps.configure_pages.outcome == 'success'
+        continue-on-error: true
+        uses: actions/upload-pages-artifact@v3
         with:
           path: public
       - id: deployment
+        if: steps.configure_pages.outcome == 'success'
+        continue-on-error: true
         uses: actions/deploy-pages@v4
