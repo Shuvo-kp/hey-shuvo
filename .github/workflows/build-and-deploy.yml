@@ -1,4 +1,4 @@
-name: Build Android APK & Deploy PWA
+name: Build Android APK
 
 on:
   push:
@@ -7,8 +7,6 @@ on:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 jobs:
   build-apk:
@@ -19,7 +17,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - name: Prepare Android SDK 36.1, licenses, keystore, and env
+      - name: Prepare Android SDK 36.1, licenses, keystore, Firebase config, and env
         run: |
           SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
           echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
@@ -50,6 +48,9 @@ jobs:
 
           if [ -f debug.keystore.base64 ]; then
             base64 -d debug.keystore.base64 > debug.keystore
+          fi
+          if [ ! -f app/google-services.json ] && [ -f app/google-services.config.b64 ]; then
+            base64 -d app/google-services.config.b64 > app/google-services.json
           fi
           if [ ! -f .env ] && [ -f .env.example ]; then
             cp .env.example .env
@@ -83,25 +84,3 @@ jobs:
               --notes "Tap HeyShuvo.apk below to download and install directly on your Android phone." \
               --latest
           fi
-
-  deploy-pwa:
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - uses: actions/checkout@v4
-      - id: configure_pages
-        continue-on-error: true
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
-      - if: steps.configure_pages.outcome == 'success'
-        continue-on-error: true
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: public
-      - id: deployment
-        if: steps.configure_pages.outcome == 'success'
-        continue-on-error: true
-        uses: actions/deploy-pages@v4
