@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Hey Shuvo</string>
+    <string name="identity_tagline">Voice-First Personal &amp; Desktop AI Assistant</string>
+    <string name="sign_in_with_google">Sign in with Google</string>
+    <string name="private_circle_notice">Open Preview Active • Optional Cloud Sync via Google Sign-In</string>
+    <string name="accessibility_service_description">Allows Hey Shuvo to execute your spoken voice commands across all screens and apps — such as going Back, scrolling, opening notifications, and tapping buttons hands-free.</string>
+</resources>

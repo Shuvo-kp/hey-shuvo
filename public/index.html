@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#00E5FF" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Hey Shuvo" />
+  <title>Hey Shuvo — AI Voice & Vision</title>
+  <link rel="icon" type="image/png" sizes="192x192" href="./assets/icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="./assets/icons/icon-192.png" />
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="top-bar">
+      <div class="brand">
+        <span>⚡ HEY SHUVO</span>
+      </div>
+      <div class="pill-group">
+        <button id="installPwaBtn" class="btn-secondary" title="ফোনের হোম স্ক্রিনে সরাসরি অ্যাপ হিসেবে ইনস্টল করুন">📲 অ্যাপ ইনস্টল</button>
+        <button id="cloudAuthBtn" class="btn-outline" title="Android অ্যাপের সাথে Cloud Sync করতে Google Sign-In করুন">☁️ Sync</button>
+        <button id="planBadgeBtn" class="btn-outline">FREE</button>
+        <button id="autoModeBtn" class="btn-primary">✓ AUTO</button>
+        <button id="manualModeBtn" class="btn-outline">MANUAL</button>
+      </div>
+    </header>
+
+    <div id="remoteBannerBar" class="remote-banner hidden"></div>
+
+    <!-- Voice AI & Humanoid Robot Stage -->
+    <section id="panel-voice" class="panel active">
+      <div class="avatar-stage-container" id="avatarStageContainer">
+        <!-- Unobstructed Passport Portrait Image Frame with Real Photographic Jaw Lip-Sync -->
+        <div class="avatar-photo-wrapper" id="avatarPhotoWrapper" title="কথা বলতে ট্যাপ করুন বা ছবি দেখুন">
+          <img id="avatarPhoto" src="assets/avatars/avatar_female_chloe.webp" alt="Hey Shuvo Android Avatar" />
+          <div id="avatarMouthCavity" class="avatar-mouth-cavity" aria-hidden="true"></div>
+          <div id="avatarJawLayer" class="avatar-jaw-layer" aria-hidden="true">
+            <img id="avatarJawImg" src="assets/avatars/avatar_female_chloe.webp" alt="" />
+          </div>
+          <div id="templeLedRing" class="temple-led-ring"></div>
+        </div>
+
+        <!-- Clean External Footer Controls BELOW Portrait Image -->
+        <div class="avatar-footer-bar">
+          <div class="avatar-status-row">
+            <div class="avatar-persona-badge">
+              <span id="avatarLedDot" class="avatar-led-dot"></span>
+              <span id="personaModelName">Chloe Android (নারী)</span>
+            </div>
+            <div id="speechWave" class="speech-wave hidden" aria-hidden="true">
+              <span></span><span></span><span></span><span></span><span></span>
+            </div>
+          </div>
+          <div class="avatar-actions">
+            <button id="cyclePhotoBtn" class="btn-micro" title="ছবি পরিবর্তন করুন">ছবি 📷 1/3</button>
+            <button id="quickSwitchVoiceBtn" class="btn-micro btn-micro-accent" title="নারী / পুরুষ / ডিপ ভয়েস পরিবর্তন করুন">পুরুষ কণ্ঠ ⇄</button>
+          </div>
+          <div class="avatar-sub-actions">
+            <input id="customAvatarInput" type="file" accept="image/*" class="hidden" />
+            <button id="uploadCustomAvatarBtn" class="btn-micro btn-micro-sub" title="নিজের পছন্দের ছবি আপলোড করুন">🖼️ কাস্টম ছবি</button>
+            <button id="resetCustomAvatarBtn" class="btn-micro btn-micro-sub hidden" title="কাস্টম ছবি সরান">↺ রিসেট</button>
+            <button id="toggleMicEngineBtn" class="btn-micro btn-micro-sub" title="মাইক ইঞ্জিন: অটো / Speech / VAD">🎙️ অটো</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="voiceStatus" class="status-text">অটো ভয়েস প্রস্তুত — কথা বলুন...</div>
+      <div id="chatBox" class="chat-box empty-chat"></div>
+      <div id="manualInputBar" class="input-bar hidden">
+        <input id="textCommandInput" type="text" placeholder="লিখুন বা ভয়েস দিন..." />
+        <button id="micTapBtn" class="btn-secondary" title="ভয়েস দিন">🎤</button>
+        <button id="sendTextBtn" class="btn-primary">পাঠান</button>
+      </div>
+    </section>
+
+    <!-- Camera & Photo Vision -->
+    <section id="panel-camera" class="panel">
+      <h3>📷 ক্যামেরা ও পরিবেশ বিশ্লেষণ</h3>
+      <div class="pill-group">
+        <button id="startCamBtn" class="btn-primary">ক্যামেরা চালু করুন</button>
+        <button id="switchCamBtn" class="btn-outline">ফ্রন্ট / রিয়ার</button>
+        <button id="captureAnalyzeBtn" class="btn-secondary">ছবি তুলে বিশ্লেষণ করুন</button>
+      </div>
+      <video id="cameraVideo" autoplay playsinline muted></video>
+      <canvas id="captureCanvas" style="display:none;"></canvas>
+      <div class="input-bar">
+        <input id="visionQueryInput" type="text" placeholder="ক্যামেরা নিয়ে কিছু জিজ্ঞাসা করুন (ঐচ্ছিক)..." />
+      </div>
+      <div id="visionResult" class="msg ai" style="max-width:100%;">ক্যামেরা চালু করে ছবি তুলুন—আমি পরিবেশ, মানুষ, লেখা ও সম্ভাব্য আবেগ বিশ্লেষণ করে ভয়েসে বলে দেব।</div>
+    </section>
+
+    <!-- Smart Hub (Tally, Birthdays, Translator, Diary, Theme, Helplines) -->
+    <section id="panel-hub" class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+        <h3>🧩 স্মার্ট হাব (Smart Utility Hub)</h3>
+        <div class="pill-group">
+          <button class="btn-outline hub-theme-btn" data-theme="cyan">Cyan</button>
+          <button class="btn-outline hub-theme-btn" data-theme="emerald">Emerald</button>
+          <button class="btn-outline hub-theme-btn" data-theme="gold">Gold</button>
+          <button class="btn-outline hub-theme-btn" data-theme="violet">Violet</button>
+        </div>
+      </div>
+
+      <div class="pill-group">
+        <button class="btn-primary hub-sub-btn" data-hub="hub-tally">📒 ট্যালি খাতা</button>
+        <button class="btn-outline hub-sub-btn" data-hub="hub-birthday">🎂 বার্থডে উইশ</button>
+        <button class="btn-outline hub-sub-btn" data-hub="hub-writer">🌐 অনুবাদক ও লেখক</button>
+        <button class="btn-outline hub-sub-btn" data-hub="hub-diary">📓 ভয়েস ডায়েরি</button>
+        <button class="btn-outline hub-sub-btn" data-hub="hub-emergency">🚨 জরুরি সেবা</button>
+      </div>
+
+      <!-- Tally Khata -->
+      <div id="hub-tally" class="sub-card hub-section active">
+        <h4 style="color:var(--primary);">📒 হিসাব ও ট্যালি খাতা</h4>
+        <div id="tallySummaryBar" style="font-size:13px;font-weight:600;color:var(--secondary);">আয়: ৳০ | খরচ: ৳০ | বাকি: ৳০</div>
+        <div class="grid-2">
+          <input id="tallyCustomerInput" type="text" placeholder="কাস্টমার / বিবরণ (যেমন: রহিম ভাই চাল)" />
+          <input id="tallyAmountInput" type="number" placeholder="টাকার পরিমাণ (৳)" />
+        </div>
+        <div class="pill-group">
+          <select id="tallyTypeSelect" class="styled-select">
+            <option value="INCOME">আয় (Income)</option>
+            <option value="EXPENSE">খরচ (Expense)</option>
+            <option value="DUE">বাকি (Due)</option>
+          </select>
+          <button id="addTallyBtn" class="btn-primary">+ হিসাব সেভ করুন</button>
+        </div>
+        <div id="tallyList" class="hub-list"></div>
+      </div>
+
+      <!-- Birthday Reminders -->
+      <div id="hub-birthday" class="sub-card hub-section">
+        <h4 style="color:var(--primary);">🎂 জন্মদিনের রিমাইন্ডার ও AI উইশ</h4>
+        <div class="grid-2">
+          <input id="bdayNameInput" type="text" placeholder="নাম (যেমন: রফিক)" />
+          <input id="bdayPhoneInput" type="text" placeholder="WhatsApp নম্বর (+8801...)" />
+        </div>
+        <div class="grid-2">
+          <input id="bdayDayInput" type="number" min="1" max="31" placeholder="দিন (১-৩১)" />
+          <input id="bdayMonthInput" type="number" min="1" max="12" placeholder="মাস (১-১২)" />
+        </div>
+        <div class="input-bar">
+          <input id="bdayWishInput" type="text" placeholder="জন্মদিনের শুভেচ্ছা মেসেজ (বা AI দিয়ে লিখুন)" />
+          <button id="genAiWishBtn" class="btn-secondary">✨ AI উইশ</button>
+        </div>
+        <button id="saveBirthdayBtn" class="btn-primary">রিমাইন্ডার সেভ করুন</button>
+        <div id="birthdayList" class="hub-list"></div>
+      </div>
+
+      <!-- Smart Translator & Writer -->
+      <div id="hub-writer" class="sub-card hub-section">
+        <h4 style="color:var(--primary);">🌐 স্মার্ট অনুবাদক ও চিঠি/ইমেইল লেখক</h4>
+        <textarea id="writerInput" rows="3" placeholder="বাংলা, Banglish বা ইংরেজি লেখা দিন..."></textarea>
+        <div class="pill-group">
+          <button id="transBnEnBtn" class="btn-primary">বাংলা → English</button>
+          <button id="transEnBnBtn" class="btn-primary">English → বাংলা</button>
+          <button id="fixGrammarBtn" class="btn-outline">বানান ও বাক্য শুদ্ধ</button>
+          <button id="officialLetterBtn" class="btn-secondary">অফিসিয়াল চিঠি/ইমেইল</button>
+        </div>
+        <div id="writerOutput" class="msg ai" style="max-width:100%;display:none;"></div>
+        <div class="pill-group">
+          <button id="speakWriterBtn" class="btn-outline hidden">🔊 শুনুন</button>
+          <button id="copyWriterBtn" class="btn-outline hidden">📋 কপি করুন</button>
+        </div>
+      </div>
+
+      <!-- Daily Voice Diary -->
+      <div id="hub-diary" class="sub-card hub-section">
+        <h4 style="color:var(--primary);">📓 সারাদিনের ভয়েস ও কাজের ডায়েরি</h4>
+        <p style="font-size:12px;color:var(--muted);">আপনার ভয়েস ও টেক্সট কথোপকথনের সারসংক্ষেপ এখানে সংরক্ষিত থাকে। চাইলে দিনশেষে AI সামারি ও ইমেইল ড্রাফট তৈরি করতে পারেন।</p>
+        <div class="pill-group">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
+            <input id="diaryAutoLogToggle" type="checkbox" checked /> অটো ডায়েরি লগ চালু
+          </label>
+          <button id="genDiarySummaryBtn" class="btn-primary">✨ আজকের AI সামারি</button>
+          <button id="clearDiaryBtn" class="btn-outline">লগ মুছুন</button>
+        </div>
+        <div id="diarySummaryOutput" class="msg ai" style="max-width:100%;display:none;"></div>
+        <div id="diaryEmailRow" class="pill-group hidden">
+          <input id="diaryEmailInput" type="email" placeholder="প্রাপক ইমেইল (ঐচ্ছিক)" />
+          <button id="emailDiaryBtn" class="btn-secondary">📧 ইমেইল ড্রাফট খুলুন</button>
+        </div>
+        <div id="diaryLogList" class="hub-list"></div>
+      </div>
+
+      <!-- Emergency Helplines -->
+      <div id="hub-emergency" class="sub-card hub-section">
+        <h4 style="color:var(--primary);">🚨 বাংলাদেশ জরুরি হেল্পলাইন</h4>
+        <div class="hub-list">
+          <div class="hub-item"><div><strong>জাতীয় জরুরি সেবা (৯৯৯)</strong><br><small>পুলিশ, ফায়ার সার্ভিস ও অ্যাম্বুলেন্স</small></div><a class="btn-primary" href="tel:999" style="text-decoration:none;">📞 999</a></div>
+          <div class="hub-item"><div><strong>জাতীয় তথ্য ও সেবা (৩৩৩)</strong><br><small>সরকারি সেবা ও নাগরিক সহায়তা</small></div><a class="btn-primary" href="tel:333" style="text-decoration:none;">📞 333</a></div>
+          <div class="hub-item"><div><strong>স্বাস্থ্য বাতায়ন (১৬২৬৩)</strong><br><small>২৪ ঘণ্টা সরকারি ডাক্তারের পরামর্শ</small></div><a class="btn-primary" href="tel:16263" style="text-decoration:none;">📞 16263</a></div>
+          <div class="hub-item"><div><strong>নারী ও শিশু সহায়তা (১০৯)</strong><br><small>নারী ও শিশু সুরক্ষা হেল্পলাইন</small></div><a class="btn-primary" href="tel:109" style="text-decoration:none;">📞 109</a></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Master Control & Cross-Device Transfer Hub -->
+    <section id="panel-master" class="panel">
+      <!-- Locked State -->
+      <div id="masterLockGate" style="display:flex;flex-direction:column;gap:14px;align-items:center;padding:24px 12px;text-align:center;">
+        <div style="font-size:36px;">🔐</div>
+        <h3 style="color:var(--primary);">মাস্টার কন্ট্রোল সিকিউরিটি লগইন</h3>
+        <p style="font-size:13px;color:var(--muted);max-width:380px;">মাস্টার ফাইল সম্পূর্ণ সুরক্ষিত। প্রবেশ করতে অনুমোদিত ইমেইল এবং মাস্টার পাসওয়ার্ড দিন অথবা Google Owner দিয়ে সিঙ্ক করুন।</p>
+        <div id="masterAuthError" style="color:var(--danger);font-size:13px;font-weight:600;min-height:18px;"></div>
+        <div style="max-width:380px;width:100%;display:flex;flex-direction:column;gap:10px;">
+          <input id="masterLoginEmail" type="email" placeholder="অনুমোদিত অ্যাডমিন ইমেইল" autocomplete="email" />
+          <input id="masterLoginPassword" type="password" placeholder="মাস্টার পাসওয়ার্ড" autocomplete="current-password" />
+          <button id="masterLoginBtn" class="btn-primary" style="height:44px;">মাস্টার ফাইলে প্রবেশ করুন</button>
+          <button id="masterCloudOwnerBtn" class="btn-outline hidden" style="height:42px;">✓ ক্লাউড Owner অ্যাকাউন্ট দিয়ে আনলক করুন</button>
+        </div>
+      </div>
+
+      <!-- Unlocked State -->
+      <div id="masterUnlockedView" style="display:none;flex-direction:column;gap:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+          <h3>🛡️ মাস্টার কন্ট্রোল স্টুডিও</h3>
+          <button id="masterLockBtn" class="btn-outline" style="color:var(--danger);border-color:var(--danger);">🔒 লক করুন</button>
+        </div>
+
+        <div class="grid-2">
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <label style="font-size:13px;color:var(--muted);">Gemini API Key (ব্রাউজারে সংরক্ষিত থাকবে):</label>
+            <input id="apiKeyInput" type="password" placeholder="AIza..." />
+            <button id="saveApiKeyBtn" class="btn-primary">API Key সেভ করুন</button>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <label style="font-size:13px;color:var(--muted);">গ্লোবাল পেইড সিস্টেম:</label>
+            <button id="toggleGlobalPaidBtn" class="btn-secondary">গ্লোবাল পেইড: চালু</button>
+            <div class="pill-group">
+              <button id="setPaid30Btn" class="btn-outline">৩০ দিন Paid</button>
+              <button id="setPaidLifeBtn" class="btn-outline">লাইফটাইম</button>
+              <button id="setFreeBtn" class="btn-outline">Free করুন</button>
+              <button id="bonus10Btn" class="btn-outline">+১০ বোনাস</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div>
+            <label style="font-size:12px;color:var(--muted);">মাসিক ফি (৳):</label>
+            <input id="monthlyFeeInput" type="number" value="299" />
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--muted);">দৈনিক ফ্রি লিমিট:</label>
+            <input id="freeLimitInput" type="number" value="25" />
+          </div>
+        </div>
+        <button id="savePricingBtn" class="btn-primary">ফি ও লিমিট সেভ ও ক্লাউড সিঙ্ক করুন</button>
+
+        <!-- Master Password Change Card -->
+        <div class="sub-card">
+          <h4 style="color:var(--primary);">🔐 মাস্টার পাসওয়ার্ড পরিবর্তন</h4>
+          <p style="font-size:12px;color:var(--muted);">কমপক্ষে ৬ অক্ষরের নিরাপদ পাসওয়ার্ড ব্যবহার করুন (SHA-256 সুরক্ষিত)।</p>
+          <div id="passChangeStatusText" style="font-size:12px;font-weight:600;"></div>
+          <input id="oldMasterPassInput" type="password" placeholder="বর্তমান পাসওয়ার্ড" />
+          <input id="newMasterPassInput" type="password" placeholder="নতুন পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)" />
+          <input id="confirmMasterPassInput" type="password" placeholder="নতুন পাসওয়ার্ড নিশ্চিত করুন" />
+          <button id="updateMasterPassBtn" class="btn-primary">পাসওয়ার্ড আপডেট করুন</button>
+        </div>
+
+        <!-- Real Cross-Device Cloud File Relay (Web <-> Android Firestore Bridge) -->
+        <div class="sub-card">
+          <h4 style="color:var(--primary);">⚡ রিয়েল ক্রস-ডিভাইস ফাইল ট্রান্সফার (মোবাইল ↔ ওয়েব)</h4>
+          <p style="font-size:12px;color:var(--muted);">অ্যান্ড্রয়েড অ্যাপের স্মার্ট হাব ও ওয়েবে একই পেয়ারিং কোড দিন এবং Google Sync চালু করুন (বড় ছবি স্বয়ংক্রিয়ভাবে কম্প্রেস হবে)।</p>
+          <input id="pairingCodeInput" type="text" value="SHUVO1" maxlength="16" placeholder="পেয়ারিং কোড (যেমন SHUVO1)" />
+          <input id="fileTransferInput" type="file" />
+          <div class="pill-group">
+            <button id="uploadTransferBtn" class="btn-secondary">📤 ফাইল সেন্ড করুন</button>
+            <button id="receiveTransferBtn" class="btn-outline">📥 ফাইল গ্রহণ করুন</button>
+          </div>
+          <div id="fileTransferStatus" style="font-size:12px;color:var(--primary);"></div>
+        </div>
+
+        <div id="masterStatusText" class="status-text"></div>
+      </div>
+    </section>
+  </div>
+
+  <nav class="bottom-nav">
+    <button class="btn-primary nav-btn" data-target="panel-voice">✨ ভয়েস AI</button>
+    <button class="btn-outline nav-btn" data-target="panel-camera">📷 ক্যামেরা</button>
+    <button class="btn-outline nav-btn" data-target="panel-hub">🧩 স্মার্ট হাব</button>
+    <button class="btn-outline nav-btn" data-target="panel-master">🛡️ মাস্টার</button>
+  </nav>
+
+  <!-- Free vs Paid Table Modal -->
+  <div id="planModal" class="modal-backdrop">
+    <div class="modal-card">
+      <h3>Free বনাম Paid প্ল্যান টেবিল</h3>
+      <p id="modalPlanSummary" style="font-size:13px;color:var(--primary);"></p>
+      <table>
+        <thead>
+          <tr>
+            <th>সুবিধা</th>
+            <th>FREE</th>
+            <th>PAID</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>দৈনিক ব্যবহার</td>
+            <td id="tableFreeLimit">২৫ বার/দিন</td>
+            <td>আনলিমিটেড</td>
+          </tr>
+          <tr>
+            <td>ভয়েস ও ক্যামেরা</td>
+            <td>সীমিত</td>
+            <td>আনলিমিটেড</td>
+          </tr>
+          <tr>
+            <td>মাসিক ফি</td>
+            <td>৳০ (ফ্রি)</td>
+            <td id="tablePaidFee">৳২৯৯/মাস</td>
+          </tr>
+        </tbody>
+      </table>
+      <button id="closePlanModalBtn" class="btn-primary">ঠিক আছে</button>
+    </div>
+  </div>
+
+  <!-- PWA Install Instructions Modal -->
+  <div id="installGuideModal" class="modal-backdrop">
+    <div class="modal-card">
+      <h3>📲 ফোনে Hey Shuvo অ্যাপ ইনস্টল করুন</h3>
+      <p id="installGuideText" style="font-size:13px;line-height:1.55;color:var(--text);">
+        কোনো আলাদা APK ছাড়াই এটি আপনার ফোনের হোম স্ক্রিনে সরাসরি অ্যাপ হিসেবে ইনস্টল হবে:<br><br>
+        <strong>Android (Chrome):</strong> উপরের ডান কোণার <strong>⋮ (থ্রি-ডট)</strong> মেনুতে ট্যাপ করুন → <strong>"Install app"</strong> অথবা <strong>"Add to Home screen"</strong> চাপুন → <strong>Install</strong> দিন।<br><br>
+        <strong>iPhone (Safari):</strong> নিচের <strong>Share (□↑)</strong> বাটনে ট্যাপ করে <strong>"Add to Home Screen"</strong> চাপুন।<br><br>
+        <em>টিপস: আপনি যদি AI Studio প্রিভিউ ফ্রেমের ভেতরে থাকেন, তবে Shared App লিংকটি সরাসরি Chrome-এ খুলে ইনস্টল করুন।</em>
+      </p>
+      <div class="pill-group" style="justify-content:flex-end;">
+        <button id="copyAppUrlBtn" class="btn-outline">🔗 অ্যাপ লিংক কপি করুন</button>
+        <button id="closeInstallModalBtn" class="btn-primary">বুঝেছি</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>

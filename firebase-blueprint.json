@@ -1,0 +1,465 @@
+{
+  "entities": {
+    "MasterBootstrap": {
+      "title": "MasterBootstrap",
+      "description": "One-time immutable bootstrap document binding the first Master Owner UID.",
+      "type": "object",
+      "properties": {
+        "ownerUid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the primary Master App owner."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp via FieldValue.serverTimestamp()."
+        }
+      },
+      "required": ["ownerUid", "createdAt"]
+    },
+    "AdminRecord": {
+      "title": "AdminRecord",
+      "description": "Server-provisioned administrator marker granting Master Governance authority.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the administrator."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp via FieldValue.serverTimestamp()."
+        }
+      },
+      "required": ["userId", "createdAt"]
+    },
+    "CustomerRemoteConfig": {
+      "title": "CustomerRemoteConfig",
+      "description": "Live Master-to-Customer remote configuration, issue patches, and active feature flags.",
+      "type": "object",
+      "properties": {
+        "configVersion": {
+          "type": "integer",
+          "description": "Monotonically increasing configuration version."
+        },
+        "announcementBanner": {
+          "type": "string",
+          "description": "Live notice or update message pushed from Master App to Customer App."
+        },
+        "forcedThemePalette": {
+          "type": "string",
+          "description": "Optional theme palette override pushed by Master App, or empty string."
+        },
+        "defaultAutoVoice": {
+          "type": "boolean",
+          "description": "Whether Auto All-Display voice is enabled by default for Customer App."
+        },
+        "customSystemPrompt": {
+          "type": "string",
+          "description": "Live Master operational instructions and issue corrections applied to Customer AI."
+        },
+        "enabledFeatureFlags": {
+          "type": "string",
+          "description": "Comma-separated enabled Customer App modules."
+        },
+        "lastAppliedFixSummary": {
+          "type": "string",
+          "description": "Human-readable summary of the latest Master fix or feature rollout."
+        },
+        "monthlyPaidFeeBdt": {
+          "type": "integer",
+          "description": "Optional cloud-synced monthly paid fee in BDT."
+        },
+        "freeDailyLimit": {
+          "type": "integer",
+          "description": "Optional cloud-synced daily free usage limit."
+        },
+        "globalPaidModeEnabled": {
+          "type": "boolean",
+          "description": "Optional cloud-synced global paid mode toggle."
+        },
+        "updatedByUid": {
+          "type": "string",
+          "description": "UID of the Master Owner who published this update."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp via FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp via FieldValue.serverTimestamp()."
+        }
+      },
+      "required": [
+        "configVersion",
+        "announcementBanner",
+        "forcedThemePalette",
+        "defaultAutoVoice",
+        "customSystemPrompt",
+        "enabledFeatureFlags",
+        "lastAppliedFixSummary",
+        "updatedByUid",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "UserAccount": {
+      "title": "UserAccount",
+      "description": "Private circle member account metadata without personal conversations or private files.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the account."
+        },
+        "email": {
+          "type": "string",
+          "description": "Verified Google account email."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Display name of the member."
+        },
+        "accountRole": {
+          "type": "string",
+          "enum": ["owner", "member"],
+          "description": "Role in the private circle."
+        },
+        "accessStatus": {
+          "type": "string",
+          "enum": ["pending", "approved", "suspended"],
+          "description": "Owner-controlled approval status."
+        },
+        "subscriptionTier": {
+          "type": "string",
+          "enum": ["free", "paid"],
+          "description": "Owner-controlled subscription tier."
+        },
+        "deviceModel": {
+          "type": "string",
+          "description": "Consented device model and OS string."
+        },
+        "cityRegion": {
+          "type": "string",
+          "description": "Consented city-level location only."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp via FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp via FieldValue.serverTimestamp()."
+        }
+      },
+      "required": ["userId", "email", "displayName", "accountRole", "accessStatus", "createdAt", "updatedAt"]
+    },
+    "Invitation": {
+      "title": "Invitation",
+      "description": "Owner-issued private circle invitation.",
+      "type": "object",
+      "properties": {
+        "invitedEmail": {
+          "type": "string",
+          "description": "Email address invited by the owner."
+        },
+        "invitedByUid": {
+          "type": "string",
+          "description": "UID of the owner issuing the invitation."
+        },
+        "note": {
+          "type": "string",
+          "description": "Relationship or note (e.g., Family, Close Friend)."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["invited", "accepted", "revoked"],
+          "description": "Lifecycle status of the invitation."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp via FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp via FieldValue.serverTimestamp()."
+        }
+      },
+      "required": ["invitedEmail", "invitedByUid", "note", "status", "createdAt", "updatedAt"]
+    },
+    "FeatureRequest": {
+      "title": "FeatureRequest",
+      "description": "Customer or owner feature request with owner approval workflow.",
+      "type": "object",
+      "properties": {
+        "requesterUid": {
+          "type": "string",
+          "description": "UID of the user who submitted the feature request."
+        },
+        "requesterName": {
+          "type": "string",
+          "description": "Display name of the requester."
+        },
+        "title": {
+          "type": "string",
+          "description": "Short feature request title."
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed feature description in Bangla or English."
+        },
+        "recommendedSkill": {
+          "type": "string",
+          "description": "Proposed modular Skill coverage or new Skill."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["submitted", "test_first", "approved", "later", "rejected"],
+          "description": "Owner decision status."
+        },
+        "requiresPlayUpdate": {
+          "type": "boolean",
+          "description": "Whether native Android permissions/code update is required."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp via FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp via FieldValue.serverTimestamp()."
+        }
+      },
+      "required": ["requesterUid", "requesterName", "title", "description", "recommendedSkill", "status", "requiresPlayUpdate", "createdAt", "updatedAt"]
+    },
+    "SkillModule": {
+      "title": "SkillModule",
+      "description": "Signed and validated modular Skill configuration managed by the Owner.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Skill module name."
+        },
+        "description": {
+          "type": "string",
+          "description": "Skill description and capabilities."
+        },
+        "version": {
+          "type": "string",
+          "description": "Semantic version string."
+        },
+        "instructions": {
+          "type": "string",
+          "description": "Validated operational prompt/configuration."
+        },
+        "requiredPermissions": {
+          "type": "string",
+          "description": "Comma-separated required permission summary."
+        },
+        "supportedLanguages": {
+          "type": "string",
+          "description": "Supported languages (Bangla, English, Banglish, Regional)."
+        },
+        "rolloutPercentage": {
+          "type": "integer",
+          "description": "Staged rollout percentage (0, 5, 25, or 100)."
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Master enable/kill switch flag for this Skill."
+        },
+        "testStatus": {
+          "type": "string",
+          "enum": ["sandbox", "verified", "rolled_back"],
+          "description": "Verification status before release."
+        },
+        "updatedByUid": {
+          "type": "string",
+          "description": "UID of the owner who updated the skill."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp via FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp via FieldValue.serverTimestamp()."
+        }
+      },
+      "required": ["name", "description", "version", "instructions", "requiredPermissions", "supportedLanguages", "rolloutPercentage", "enabled", "testStatus", "updatedByUid", "createdAt", "updatedAt"]
+    },
+    "AuditEntry": {
+      "title": "AuditEntry",
+      "description": "Immutable owner governance audit log entry.",
+      "type": "object",
+      "properties": {
+        "actorUid": {
+          "type": "string",
+          "description": "UID of the owner performing the administrative action."
+        },
+        "action": {
+          "type": "string",
+          "description": "Action code (e.g., INVITE_CREATED, USER_APPROVED, CUSTOMER_CONFIG_PUSHED)."
+        },
+        "targetSummary": {
+          "type": "string",
+          "description": "Non-private summary of the governance action."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp via FieldValue.serverTimestamp()."
+        }
+      },
+      "required": ["actorUid", "action", "targetSummary", "createdAt"]
+    },
+    "GestureTransferSession": {
+      "title": "GestureTransferSession",
+      "description": "Cross-device hand-gesture air transfer session (fist-grab to open-palm drop) between phones and laptops.",
+      "type": "object",
+      "properties": {
+        "senderUid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the device user who grabbed the file."
+        },
+        "pairingCode": {
+          "type": "string",
+          "description": "4-to-12 character pairing PIN shared between sender and receiver devices."
+        },
+        "fileName": {
+          "type": "string",
+          "description": "Transferred file name."
+        },
+        "mimeType": {
+          "type": "string",
+          "description": "MIME type of the transferred file."
+        },
+        "payloadBase64": {
+          "type": "string",
+          "description": "Base64-encoded file bytes for cross-device gesture drop."
+        },
+        "fileSizeBytes": {
+          "type": "integer",
+          "description": "Original byte length of the file."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["grabbed", "received"],
+          "description": "Transfer lifecycle state."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp via FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp via FieldValue.serverTimestamp()."
+        }
+      },
+      "required": ["senderUid", "pairingCode", "fileName", "mimeType", "payloadBase64", "fileSizeBytes", "status", "createdAt", "updatedAt"]
+    },
+    "BirthdayWishEntry": {
+      "title": "BirthdayWishEntry",
+      "description": "User-scoped birthday reminder and automatic/instant wish configuration.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the owner."
+        },
+        "personName": {
+          "type": "string",
+          "description": "Name of the person whose birthday is tracked."
+        },
+        "birthDay": {
+          "type": "integer",
+          "description": "Day of month (1-31)."
+        },
+        "birthMonth": {
+          "type": "integer",
+          "description": "Month of year (1-12)."
+        },
+        "phoneOrContact": {
+          "type": "string",
+          "description": "Optional phone number or contact label for WhatsApp/SMS wish."
+        },
+        "wishMessage": {
+          "type": "string",
+          "description": "Customized Bangla or English birthday wish text."
+        },
+        "lastWishedYear": {
+          "type": "integer",
+          "description": "Calendar year when the automatic wish was last triggered (0 if never)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp via FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp via FieldValue.serverTimestamp()."
+        }
+      },
+      "required": ["userId", "personName", "birthDay", "birthMonth", "phoneOrContact", "wishMessage", "lastWishedYear", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/system_bootstrap/master_owner": {
+      "schema": "MasterBootstrap",
+      "description": "One-time immutable Master Owner claim registry."
+    },
+    "/admins/{adminUid}": {
+      "schema": "AdminRecord",
+      "description": "Server-provisioned administrator registry."
+    },
+    "/customer_configs/{configId}": {
+      "schema": "CustomerRemoteConfig",
+      "description": "Master-to-Customer live remote configuration and issue correction state."
+    },
+    "/accounts/{userId}": {
+      "schema": "UserAccount",
+      "description": "Private circle member account metadata."
+    },
+    "/invitations/{inviteId}": {
+      "schema": "Invitation",
+      "description": "Owner-managed private circle invitations."
+    },
+    "/feature_requests/{requestId}": {
+      "schema": "FeatureRequest",
+      "description": "Customer and owner feature requests."
+    },
+    "/skills/{skillId}": {
+      "schema": "SkillModule",
+      "description": "Signed modular Skill registry."
+    },
+    "/audit_logs/{logId}": {
+      "schema": "AuditEntry",
+      "description": "Owner governance audit log."
+    },
+    "/gesture_transfers/{transferId}": {
+      "schema": "GestureTransferSession",
+      "description": "Hand-gesture cross-device file transfer relay."
+    },
+    "/users/{userId}/birthdays/{birthdayId}": {
+      "schema": "BirthdayWishEntry",
+      "description": "Per-user birthday wishes and automatic reminder entries."
+    }
+  }
+}

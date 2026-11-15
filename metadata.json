@@ -1,0 +1,6 @@
+{
+  "name": "Hey Shuvo",
+  "description": "Smart voice-first personal and desktop digital assistant with All-Display & Manual voice control, live Location & Maps navigation, Camera Vision, Office/AutoCAD automation, and customizable themes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,368 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Default-Deny Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Primitive Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Verified Owner/Admin Check: Uses /admins/{uid} OR one-time immutable /system_bootstrap/master_owner (zero hardcoded personal emails).
+    function isOwnerAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (exists(/databases/$(database)/documents/system_bootstrap/master_owner) &&
+         get(/databases/$(database)/documents/system_bootstrap/master_owner).data.ownerUid == request.auth.uid)
+      );
+    }
+
+    // Check if an authenticated member is approved to access Customer Circle resources
+    function isApprovedMember() {
+      return isSignedIn() && (
+        isOwnerAdmin() ||
+        (exists(/databases/$(database)/documents/accounts/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/accounts/$(request.auth.uid)).data.accessStatus == 'approved')
+      );
+    }
+
+    // One-time Master Owner Bootstrap (write-once when unclaimed; immutable thereafter)
+    match /system_bootstrap/master_owner {
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isSignedIn() &&
+                       !exists(/databases/$(database)/documents/system_bootstrap/master_owner) &&
+                       incoming().keys().hasAll(['ownerUid', 'createdAt']) &&
+                       incoming().keys().hasOnly(['ownerUid', 'createdAt']) &&
+                       incoming().ownerUid is string &&
+                       incoming().ownerUid == request.auth.uid &&
+                       incoming().ownerUid.size() >= 1 &&
+                       incoming().ownerUid.size() <= 128 &&
+                       incoming().createdAt is timestamp &&
+                       incoming().createdAt <= request.time;
+      allow update, delete: if false;
+    }
+
+    // Collection: /admins/{adminUid} (Server-provisioned only; client writes strictly forbidden)
+    match /admins/{adminUid} {
+      allow get: if isSignedIn() && isValidId(adminUid) && request.auth.uid == adminUid;
+      allow list, create, update, delete: if false;
+    }
+
+    // CustomerRemoteConfig Schema Validation
+    function isValidCustomerRemoteConfig(data) {
+      return data.configVersion is int && data.configVersion >= 1 && data.configVersion <= 1000000 &&
+             data.announcementBanner is string && data.announcementBanner.size() <= 500 &&
+             data.forcedThemePalette is string && data.forcedThemePalette.size() <= 40 &&
+             data.defaultAutoVoice is bool &&
+             data.customSystemPrompt is string && data.customSystemPrompt.size() <= 3000 &&
+             data.enabledFeatureFlags is string && data.enabledFeatureFlags.size() <= 600 &&
+             data.lastAppliedFixSummary is string && data.lastAppliedFixSummary.size() <= 500 &&
+             (!('monthlyPaidFeeBdt' in data) || (data.monthlyPaidFeeBdt is int && data.monthlyPaidFeeBdt >= 0 && data.monthlyPaidFeeBdt <= 1000000)) &&
+             (!('freeDailyLimit' in data) || (data.freeDailyLimit is int && data.freeDailyLimit >= 1 && data.freeDailyLimit <= 100000)) &&
+             (!('globalPaidModeEnabled' in data) || data.globalPaidModeEnabled is bool) &&
+             data.updatedByUid is string && data.updatedByUid == request.auth.uid && data.updatedByUid.size() <= 128 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    // Collection: /customer_configs/{configId} (Master writes; signed-in Customer & Master devices observe live)
+    match /customer_configs/{configId} {
+      allow get, list: if isSignedIn() && isValidId(configId);
+
+      allow create: if isOwnerAdmin() &&
+                       isValidId(configId) &&
+                       incoming().keys().hasAll(['configVersion', 'announcementBanner', 'forcedThemePalette', 'defaultAutoVoice', 'customSystemPrompt', 'enabledFeatureFlags', 'lastAppliedFixSummary', 'updatedByUid', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['configVersion', 'announcementBanner', 'forcedThemePalette', 'defaultAutoVoice', 'customSystemPrompt', 'enabledFeatureFlags', 'lastAppliedFixSummary', 'monthlyPaidFeeBdt', 'freeDailyLimit', 'globalPaidModeEnabled', 'updatedByUid', 'createdAt', 'updatedAt']) &&
+                       isValidCustomerRemoteConfig(incoming());
+
+      allow update: if isOwnerAdmin() &&
+                       isValidId(configId) &&
+                       isValidCustomerRemoteConfig(incoming()) &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['configVersion', 'announcementBanner', 'forcedThemePalette', 'defaultAutoVoice', 'customSystemPrompt', 'enabledFeatureFlags', 'lastAppliedFixSummary', 'monthlyPaidFeeBdt', 'freeDailyLimit', 'globalPaidModeEnabled', 'updatedByUid', 'updatedAt']);
+
+      allow delete: if isOwnerAdmin() && isValidId(configId);
+    }
+
+    // 1. UserAccount Schema Validation
+    function isValidUserAccount(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100 &&
+             data.accountRole is string && (data.accountRole == 'owner' || data.accountRole == 'member') &&
+             data.accessStatus is string && (data.accessStatus == 'pending' || data.accessStatus == 'approved' || data.accessStatus == 'suspended') &&
+             (!('subscriptionTier' in data) || data.subscriptionTier == null || data.subscriptionTier == 'free' || data.subscriptionTier == 'paid') &&
+             (!('deviceModel' in data) || data.deviceModel == null || (data.deviceModel is string && data.deviceModel.size() <= 120)) &&
+             (!('cityRegion' in data) || data.cityRegion == null || (data.cityRegion is string && data.cityRegion.size() <= 100)) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    // 2. Invitation Schema Validation
+    function isValidInvitation(data) {
+      return data.invitedEmail is string && data.invitedEmail.size() >= 3 && data.invitedEmail.size() <= 254 &&
+             data.invitedByUid is string && data.invitedByUid == request.auth.uid && data.invitedByUid.size() <= 128 &&
+             data.note is string && data.note.size() <= 200 &&
+             data.status is string && (data.status == 'invited' || data.status == 'accepted' || data.status == 'revoked') &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    // 3. FeatureRequest Schema Validation
+    function isValidFeatureRequest(data) {
+      return data.requesterUid is string && data.requesterUid.size() >= 1 && data.requesterUid.size() <= 128 &&
+             data.requesterName is string && data.requesterName.size() >= 1 && data.requesterName.size() <= 100 &&
+             data.title is string && data.title.size() >= 3 && data.title.size() <= 140 &&
+             data.description is string && data.description.size() >= 5 && data.description.size() <= 2000 &&
+             data.recommendedSkill is string && data.recommendedSkill.size() <= 140 &&
+             data.status is string && (data.status == 'submitted' || data.status == 'test_first' || data.status == 'approved' || data.status == 'later' || data.status == 'rejected') &&
+             data.requiresPlayUpdate is bool &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    // 4. SkillModule Schema Validation
+    function isValidSkillModule(data) {
+      return data.name is string && data.name.size() >= 2 && data.name.size() <= 100 &&
+             data.description is string && data.description.size() >= 3 && data.description.size() <= 1000 &&
+             data.version is string && data.version.size() >= 1 && data.version.size() <= 32 &&
+             data.instructions is string && data.instructions.size() >= 5 && data.instructions.size() <= 4000 &&
+             data.requiredPermissions is string && data.requiredPermissions.size() <= 300 &&
+             data.supportedLanguages is string && data.supportedLanguages.size() <= 200 &&
+             data.rolloutPercentage is int && (data.rolloutPercentage == 0 || data.rolloutPercentage == 5 || data.rolloutPercentage == 25 || data.rolloutPercentage == 100) &&
+             data.enabled is bool &&
+             data.testStatus is string && (data.testStatus == 'sandbox' || data.testStatus == 'verified' || data.testStatus == 'rolled_back') &&
+             data.updatedByUid is string && data.updatedByUid == request.auth.uid && data.updatedByUid.size() <= 128 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    // 5. AuditEntry Schema Validation
+    function isValidAuditEntry(data) {
+      return data.actorUid is string && data.actorUid == request.auth.uid && data.actorUid.size() <= 128 &&
+             data.action is string && data.action.size() >= 2 && data.action.size() <= 80 &&
+             data.targetSummary is string && data.targetSummary.size() >= 2 && data.targetSummary.size() <= 500 &&
+             data.createdAt is timestamp && data.createdAt <= request.time;
+    }
+
+    // Collection: /accounts/{userId}
+    match /accounts/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (request.auth.uid == userId || isOwnerAdmin());
+      allow list: if isOwnerAdmin();
+
+      allow create: if isSignedIn() &&
+                       isValidId(userId) &&
+                       request.auth.uid == userId &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll(['userId', 'email', 'displayName', 'accountRole', 'accessStatus', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'email', 'displayName', 'accountRole', 'accessStatus', 'subscriptionTier', 'deviceModel', 'cityRegion', 'createdAt', 'updatedAt']) &&
+                       isValidUserAccount(incoming()) &&
+                       (!('subscriptionTier' in incoming()) || incoming().subscriptionTier == 'free' || isOwnerAdmin()) &&
+                       (
+                         (isOwnerAdmin() && incoming().accountRole == 'owner' && incoming().accessStatus == 'approved') ||
+                         (!isOwnerAdmin() && incoming().accountRole == 'member' && incoming().accessStatus == 'pending')
+                       );
+
+      allow update: if isSignedIn() &&
+                       isValidId(userId) &&
+                       isValidUserAccount(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().email == existing().email &&
+                       incoming().createdAt == existing().createdAt &&
+                       (
+                         // Action 1: Member updating own consented telemetry / displayName
+                         (request.auth.uid == userId &&
+                          incoming().accountRole == existing().accountRole &&
+                          incoming().accessStatus == existing().accessStatus &&
+                          incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'deviceModel', 'cityRegion', 'updatedAt'])) ||
+                         // Action 2: Owner managing approval, role promotion to owner, subscription tier, or suspension status
+                         (isOwnerAdmin() &&
+                          incoming().diff(existing()).affectedKeys().hasOnly(['accountRole', 'accessStatus', 'subscriptionTier', 'updatedAt']))
+                       );
+
+      allow delete: if isOwnerAdmin() && isValidId(userId);
+    }
+
+    // Collection: /invitations/{inviteId}
+    match /invitations/{inviteId} {
+      allow get: if isSignedIn() && isValidId(inviteId) && (
+        isOwnerAdmin() ||
+        (request.auth.token.email_verified == true && existing().invitedEmail == request.auth.token.email)
+      );
+      allow list: if isOwnerAdmin();
+
+      allow create: if isOwnerAdmin() &&
+                       isValidId(inviteId) &&
+                       incoming().keys().hasAll(['invitedEmail', 'invitedByUid', 'note', 'status', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['invitedEmail', 'invitedByUid', 'note', 'status', 'createdAt', 'updatedAt']) &&
+                       isValidInvitation(incoming());
+
+      allow update: if isOwnerAdmin() &&
+                       isValidId(inviteId) &&
+                       isValidInvitation(incoming()) &&
+                       incoming().invitedEmail == existing().invitedEmail &&
+                       incoming().invitedByUid == existing().invitedByUid &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['note', 'status', 'updatedAt']);
+
+      allow delete: if isOwnerAdmin() && isValidId(inviteId);
+    }
+
+    // Collection: /feature_requests/{requestId}
+    match /feature_requests/{requestId} {
+      allow get: if isSignedIn() && isValidId(requestId) && (existing().requesterUid == request.auth.uid || isOwnerAdmin());
+      allow list: if isSignedIn() && (existing().requesterUid == request.auth.uid || isOwnerAdmin());
+
+      allow create: if isSignedIn() &&
+                       isValidId(requestId) &&
+                       incoming().requesterUid == request.auth.uid &&
+                       incoming().keys().hasAll(['requesterUid', 'requesterName', 'title', 'description', 'recommendedSkill', 'status', 'requiresPlayUpdate', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['requesterUid', 'requesterName', 'title', 'description', 'recommendedSkill', 'status', 'requiresPlayUpdate', 'createdAt', 'updatedAt']) &&
+                       isValidFeatureRequest(incoming()) &&
+                       (incoming().status == 'submitted' || isOwnerAdmin());
+
+      allow update: if isSignedIn() &&
+                       isValidId(requestId) &&
+                       isValidFeatureRequest(incoming()) &&
+                       incoming().requesterUid == existing().requesterUid &&
+                       incoming().createdAt == existing().createdAt &&
+                       isOwnerAdmin() &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'recommendedSkill', 'status', 'requiresPlayUpdate', 'updatedAt']);
+
+      allow delete: if isOwnerAdmin() && isValidId(requestId);
+    }
+
+    // Collection: /skills/{skillId}
+    match /skills/{skillId} {
+      allow get: if isApprovedMember() && isValidId(skillId) && (existing().enabled == true || isOwnerAdmin());
+      allow list: if isOwnerAdmin() || (isSignedIn() && existing().enabled == true);
+
+      allow create: if isOwnerAdmin() &&
+                       isValidId(skillId) &&
+                       incoming().keys().hasAll(['name', 'description', 'version', 'instructions', 'requiredPermissions', 'supportedLanguages', 'rolloutPercentage', 'enabled', 'testStatus', 'updatedByUid', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['name', 'description', 'version', 'instructions', 'requiredPermissions', 'supportedLanguages', 'rolloutPercentage', 'enabled', 'testStatus', 'updatedByUid', 'createdAt', 'updatedAt']) &&
+                       isValidSkillModule(incoming());
+
+      allow update: if isOwnerAdmin() &&
+                       isValidId(skillId) &&
+                       isValidSkillModule(incoming()) &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['name', 'description', 'version', 'instructions', 'requiredPermissions', 'supportedLanguages', 'rolloutPercentage', 'enabled', 'testStatus', 'updatedByUid', 'updatedAt']);
+
+      allow delete: if isOwnerAdmin() && isValidId(skillId);
+    }
+
+    // Collection: /audit_logs/{logId} (Immutable Append-Only)
+    match /audit_logs/{logId} {
+      allow get: if isOwnerAdmin() && isValidId(logId);
+      allow list: if isOwnerAdmin();
+
+      allow create: if isOwnerAdmin() &&
+                       isValidId(logId) &&
+                       incoming().keys().hasAll(['actorUid', 'action', 'targetSummary', 'createdAt']) &&
+                       incoming().keys().hasOnly(['actorUid', 'action', 'targetSummary', 'createdAt']) &&
+                       isValidAuditEntry(incoming());
+
+      allow update, delete: if false;
+    }
+
+    // 6. GestureTransferSession Schema Validation
+    function isValidGestureTransferSession(data) {
+      return data.senderUid is string && data.senderUid.size() >= 1 && data.senderUid.size() <= 128 &&
+             data.pairingCode is string && data.pairingCode.size() >= 4 && data.pairingCode.size() <= 16 && data.pairingCode.matches('^[a-zA-Z0-9_\\-]+$') &&
+             data.fileName is string && data.fileName.size() >= 1 && data.fileName.size() <= 200 &&
+             data.mimeType is string && data.mimeType.size() >= 3 && data.mimeType.size() <= 120 &&
+             data.payloadBase64 is string && data.payloadBase64.size() >= 1 && data.payloadBase64.size() <= 750000 &&
+             data.fileSizeBytes is int && data.fileSizeBytes >= 1 && data.fileSizeBytes <= 600000 &&
+             data.status is string && (data.status == 'grabbed' || data.status == 'received') &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    // Collection: /gesture_transfers/{transferId}
+    match /gesture_transfers/{transferId} {
+      allow get: if isSignedIn() && isValidId(transferId);
+      allow list: if isSignedIn() && (
+        existing().senderUid == request.auth.uid ||
+        existing().status == 'grabbed'
+      );
+
+      allow create: if isSignedIn() &&
+                       isValidId(transferId) &&
+                       incoming().senderUid == request.auth.uid &&
+                       incoming().status == 'grabbed' &&
+                       incoming().keys().hasAll(['senderUid', 'pairingCode', 'fileName', 'mimeType', 'payloadBase64', 'fileSizeBytes', 'status', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['senderUid', 'pairingCode', 'fileName', 'mimeType', 'payloadBase64', 'fileSizeBytes', 'status', 'createdAt', 'updatedAt']) &&
+                       isValidGestureTransferSession(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(transferId) &&
+                       isValidGestureTransferSession(incoming()) &&
+                       incoming().senderUid == existing().senderUid &&
+                       incoming().pairingCode == existing().pairingCode &&
+                       incoming().fileName == existing().fileName &&
+                       incoming().mimeType == existing().mimeType &&
+                       incoming().payloadBase64 == existing().payloadBase64 &&
+                       incoming().fileSizeBytes == existing().fileSizeBytes &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().status == 'received' &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']);
+
+      allow delete: if isSignedIn() && isValidId(transferId) && (existing().senderUid == request.auth.uid || isOwnerAdmin());
+    }
+
+    // 7. BirthdayWishEntry Schema Validation
+    function isValidBirthdayWishEntry(data) {
+      return data.userId is string && data.userId == request.auth.uid && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.personName is string && data.personName.size() >= 1 && data.personName.size() <= 100 &&
+             data.birthDay is int && data.birthDay >= 1 && data.birthDay <= 31 &&
+             data.birthMonth is int && data.birthMonth >= 1 && data.birthMonth <= 12 &&
+             data.phoneOrContact is string && data.phoneOrContact.size() <= 80 &&
+             data.wishMessage is string && data.wishMessage.size() >= 2 && data.wishMessage.size() <= 600 &&
+             data.lastWishedYear is int && data.lastWishedYear >= 0 && data.lastWishedYear <= 2200 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    // Collection: /users/{userId}/birthdays/{birthdayId}
+    match /users/{userId}/birthdays/{birthdayId} {
+      allow get, list: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+
+      allow create: if isSignedIn() &&
+                       isValidId(userId) &&
+                       isValidId(birthdayId) &&
+                       request.auth.uid == userId &&
+                       incoming().keys().hasAll(['userId', 'personName', 'birthDay', 'birthMonth', 'phoneOrContact', 'wishMessage', 'lastWishedYear', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'personName', 'birthDay', 'birthMonth', 'phoneOrContact', 'wishMessage', 'lastWishedYear', 'createdAt', 'updatedAt']) &&
+                       isValidBirthdayWishEntry(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(userId) &&
+                       isValidId(birthdayId) &&
+                       request.auth.uid == userId &&
+                       isValidBirthdayWishEntry(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['personName', 'birthDay', 'birthMonth', 'phoneOrContact', 'wishMessage', 'lastWishedYear', 'updatedAt']);
+
+      allow delete: if isSignedIn() && isValidId(userId) && isValidId(birthdayId) && request.auth.uid == userId;
+    }
+  }
+}
